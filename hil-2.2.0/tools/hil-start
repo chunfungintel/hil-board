@@ -1,0 +1,90 @@
+#!/bin/bash
+###########################################################################
+#
+# Copyright (c) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+# Start the HIL server process in background and opens serial port to Arduino
+#
+# Contact: harts_support@intel.com
+#
+###########################################################################
+
+currentScript=`realpath $0`
+currentScriptPath=`dirname ${currentScript}`
+hilBasePath=`dirname ${currentScriptPath}../`
+hilServerPath=${hilBasePath}/server/hil_server
+hilPingPath=${hilBasePath}/tools/hil-ping
+
+ignorePing=0
+
+
+function main () {
+    processCliArgs "$@"
+
+    nc -z -w 1 localhost 9999
+    # Exit status == 0 if HIL Server is listening on port 9999
+    # Exit status != 0 if no one is listening on port 9999
+
+    if [ $? -eq 0 ] ; then
+        echo "The HIL server appears to be already running on http://localhost:9999"
+        exit 1
+    fi
+
+    echo "Starting HIL server from ${hilServerPath}"
+    ${hilServerPath} start &
+    if [ $? -ne 0 ] ; then
+        echo "The HIL server was not started successfully."
+        exit 2
+    fi
+
+    ${hilPingPath}
+    isOnline=$?
+
+    if [ ${isOnline} -ne 0 -a ${ignorePing} -eq 0 ] ; then
+        echo "The HIL board is not online"
+        exit 3
+    fi
+}
+
+
+###########################################################################
+#
+# Processes the command line options.
+#
+###########################################################################
+
+function processCliArgs () {
+
+    for option in "$@" ; do
+        case "${option}" in
+            --ignore-ping )
+                ignorePing=1
+                ;;
+            --help )
+                echo "HIL start"
+                echo "Command options:"
+                echo "--ignore-ping" 
+                echo "    Ignores the Arduino board attached or not"
+                echo "--help"
+                echo "    Prints this help message" 
+                exit 0
+                ;;
+            --*=* )
+                option=$(expr $option : '\(--.*\)=.*')
+                echo "$option : unknown option. Use --help for details."
+                ;;
+            * )
+                _action=${option}
+                ;;
+        esac
+    done
+
+}
+
+#######################################################################
+#
+# 
+#
+#######################################################################
+
+main "$@"

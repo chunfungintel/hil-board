@@ -1,0 +1,88 @@
+#!/bin/bash
+###########################################################################
+#
+# Copyright (c) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+#
+# Tool for connecting the HIL board
+# Contact: harts_support@intel.com
+#
+###########################################################################
+
+
+# Max time to wait for the HIL Server to come up.
+MAX_STARTUP_WAIT_TIME=10
+
+# Port where HIL Server listens for clients.
+_hilPort=9999
+
+# OpenBSD netcat command
+_netcat=nc
+
+
+#######################################################################
+#
+# 
+#
+#######################################################################
+
+function moveHilBoardToOnline () {
+
+    # First we wait for the HIL Server to come up.
+
+    local maxWaitTime=${MAX_STARTUP_WAIT_TIME}
+
+    for n in $(seq $((${maxWaitTime})) -1 1) ; do
+        isHilServerListening && break
+        echo "Waiting for HIL service to respond (${n}/${maxWaitTime} s)..."
+        sleep 1
+    done
+
+    if isHilServerListening ; then
+        curl --fail --silent http://localhost:9999/api/v1/stack > /dev/null
+        if [ $? -ne 0 ] ; then
+            echo "HIL board is not online"
+            echo "Bringing HIL board online ..."
+            curl -X POST http://localhost:${_hilPort}/api/v1/stack -d '{"watchdog": true}'
+            if [ $? -ne 0 ] ; then
+                echo "Unable to connect to HIL board"
+                exit 2
+            fi
+            echo
+        else
+            echo "HIL board is online"
+        fi
+    else
+        echo "Timed out waiting for HIL service to respond."       
+        exit 1
+    fi
+}
+
+
+#######################################################################
+#
+# Checks if the HIL Server is listening for connections.
+#
+#######################################################################
+
+function isHilServerListening () {
+
+    # Timeout in seconds. Note that because we are connecting to
+    # "localhost", time timeout is not supposed to be relevant.
+    local timeout=1
+
+    ${_netcat} -z -w ${timeout} localhost ${_hilPort}
+
+    # Exit status == 0 if HIL Server is listening on port ${_hilPort}
+    # Exit status != 0 if no one is listening on port ${_hilPort}
+}
+
+
+#######################################################################
+#
+# Script entry point.
+#
+#######################################################################
+
+moveHilBoardToOnline
+

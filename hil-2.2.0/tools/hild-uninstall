@@ -1,0 +1,33 @@
+#!/bin/bash
+###########################################################################
+#
+# Copyright (c) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+#
+# Contact: harts_support@intel.com
+#
+###########################################################################
+
+function _checkUser () {
+
+    local allowedUser=$1
+    local currentUser=$(id --user --name)
+
+    if [ ${currentUser} != ${allowedUser} ] ; then
+        echo "Only user \"${allowedUser}\" is allowed to run this tool."
+        exit 1
+    fi
+}
+
+_checkUser root
+
+echo "Stopping the HIL daemon"
+systemctl stop hil
+echo "Disabling the HIL daemon"
+systemctl disable hil
+echo "Removing the HIL daemon"
+rm /etc/systemd/system/hil.service
+systemctl daemon-reload
+systemctl reset-failed
+echo "Removing the HIL daemon completed"
+

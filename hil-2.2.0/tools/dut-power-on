@@ -1,0 +1,27 @@
+#!/bin/bash
+###########################################################################
+#
+# Copyright (c) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+#
+# Contact: harts_support@intel.com
+#
+###########################################################################
+
+
+currentScript=`realpath $0`
+currentScriptPath=`dirname ${currentScript}`
+hilBasePath=`dirname ${currentScriptPath}../`
+hilPingPath=${hilBasePath}/tools/hil-ping
+
+${hilPingPath}
+
+if [ $? -ne 0 ] ; then
+    echo "The HIL board is not online"
+    exit 1
+fi
+
+curl -X PUT http://localhost:9999/api/v1/stack/hil1/power1 -H 'Content-Type: application/json' -d '{"state": 1}'
+curl http://localhost:9999/api/v1/stack/hil1/power1
+echo
+
