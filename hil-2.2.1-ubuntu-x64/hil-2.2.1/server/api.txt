@@ -1,0 +1,174 @@
+############################################################################
+#
+# Copyright (c) 2015-2017 Intel Deutschland GmbH, All Rights Reserved.
+# Copyright (c) 2014 Intel Mobile Communications GmbH, All Rights Reserved.
+#
+############################################################################
+
+########################################################################################################################
+HIL Stack REST API Interface v2.2.1
+########################################################################################################################
+
+Common functionality and Arduino:
+--------------------------------
+GET /api/v<version>/settings
+    Gets all the settings for the Arduino, HIL Board and SIM s/w, and the web server
+    return: 200 OK
+
+POST /api/v<version>/stack
+    Connect host PC to Arduino (the stack).
+
+    Options:
+        reset = Reset the HIL board's state when opening the serial port, true or false.
+            default: true
+            N.B.:    Works only in Windows
+
+        watchdog = Enable watchdog at 8s, kicked each 4s, true or false
+            default: false
+
+        Serial port = Provide the desired serial COM port as JSON string in the request body using the format below:
+            default: The COM port is detected automatically
+
+        {'reset': true | false,
+         'watchdog': true | false,
+         'arduino': {'port': {'port_name': '<COM_PORT_NUMBER_AS_SEEN_BY_OS>'}}}
+
+    return: 201 Created, if successful
+            404 Not Found, otherwise, the field "hil_error" contains the error message
+
+DELETE /api/v<version>/stack
+    Disconnect host PC from Arduino (the stack)
+    return: 204 No Content
+            404 Not Found, if the board was not connected before, the field "hil_error" contains the error message
+
+GET /api/v<version>/stack
+    Gets a list with all available boards present (detected) in the stack, e.g. HIL, SIM switch, etc.
+    return: 200 OK, if successful
+            404 Not Found, in case the Arduino board is not connected, the field "hil_error" contains the error message
+
+PUT /api/v<version>/stack
+    Options:
+        sleep = The amount of seconds the host intends to sleep, zero if the host wakes up.
+            Arduino will reset the WDT by itself while the host sleeps.
+            When host wakes up, the test case must notify Arduino that is awake (sleep = 0)
+            If the host doesn't wake up in time, the Arduino's WDT will reset the board.
+
+    return: 200 OK, if successful
+            404 Not Found, in case the Arduino board is not connected, the field "hil_error" contains the error message
+            500 Internal Server Error, in case of any other error, the field "hil_error" contains the error message
+
+
+HIL Boards:
+-----------
+PUT /api/v<version>/stack/hil<board>/<resource>       (e.g.  PUT /api/v<version>/stack/hil1/usb1)
+    Sets the state of <resource> from the HIL board identified by the id <board>. See GET /api/v<version>/stack for all available HIL boards ids.
+    Specify the new state in the request body using this JSON format:
+    {"state": true|false|"L"|"l"|"0"|"Low"|"low"|"LOW"|"low"|"off"|"OFF"|"H"|"h"|"1"|"High"|"high"|"HIGH"|"on"|"ON"}
+    return: 200 OK if successful
+            400 Bad Request - The request is malformed, such as if the body does not parse
+            404 Not Found   - in case the Arduino board is not connected or the specified resource does not exist
+            410 Gone        - Detected unresponsive Arduino and the board is disconnected. Reconnect is required.
+
+GET /api/v<version>/stack/hil<board>/<resource>       (e.g.  GET /api/v<version>/stack/hil1/usb1)
+    Gets the state of <resource> from the n-th HIL board
+    return: 200 OK if successful
+            404 Not Found   - in case the Arduino board is not connected or the specified resource does not exist
+            410 Gone        - Detected unresponsive Arduino and the board is disconnected. Reconnect is required.
+
+GET /api/v<version>/stack/hil<board>
+    Gets the status of all the resources available on a HIL board
+    return: 200 OK if successful
+            404 Not Found   - in case the Arduino board is not connected, the field "hil_error" contains the error message
+            410 Gone        - Detected unresponsive Arduino and the board is disconnected. Reconnect is required.
+
+
+SIM switch:
+-----------
+GET     /api/v<version>/stack/simsw<board>
+    Gets the state of the SIM switch in JSON format: {'enabled': true|false, 'sim': 'SIM<sim>'}
+        where 'SIM<sim>' specifies the selected SIM, and 'enabled' specifies if the selected SIM is enabled or not.
+    return: 200 OK          - if successful and response body: {"enabled": true|false, "sim": "<active_sim>"}
+            404 Not Found   - in case the Arduino board is not connected or the specified resource does not exist
+            410 Gone        - Detected unresponsive Arduino and the board is disconnected. Reconnect is required.
+
+PUT     /api/v<version>/stack/simsw<board>
+    Sets the state of the SIM switch.
+    Specify the new state in the request body using this JSON format: {'enabled': true|false|"L"|"l"|"0"|"Low"|"low"|"LOW"|"low"|"off"|"OFF"|"H"|"h"|"1"|"High"|"high"|"HIGH"|"on"|"ON", 'sim': 'SIM<sim>'}
+        where 'SIM<sim>' specifes the SIM to be selected, and 'enabled' specifies if the selected SIM to be enabled or not.
+    return: 200 OK          - if successful
+            400 Bad Request - The request is malformed, such as if the body does not parse
+            404 Not Found   - in case the Arduino board is not connected or the specified resource does not exist
+            410 Gone        - Detected unresponsive Arduino and the board is disconnected. Reconnect is required.
+
+GET     /api/v<version>/stack/simsw<board>/sims
+    Gets the SIM configuration for a SIM switch, i.e. the list of the detected SIMs inside the slots of a SIM switch
+    return: 200 OK          - if successful and response body: [<the list of strings with the detected SIM cards>]
+            404 Not Found   - in case the Arduino board is not connected or the specified resource does not exist
+            410 Gone        - Detected unresponsive Arduino and the board is disconnected. Reconnect is required.
+
+Note:
+-----
+All the GET commands can be suffixed with ?pprint=true for pretty print of the JSON result
+
+
+Example usage:
+--------------
+
+    Connect to Arduino
+        curl -X POST http://localhost:9999/api/v1/stack
+
+    Connect to Arduino using a specified port number:
+        curl -X POST http://localhost:9999/api/v1/stack -H "Content-Type: application/json" -d "{\"arduino\": {\"port\": {\"port_name\": \"COM30\"}}}"
+        curl -X POST http://localhost:9999/api/v1/stack -H "Content-Type: application/json" -d "{\"arduino\": {\"port\": {\"port_name\": \"/dev/ttyACM0\"}}}"
+
+    Connect to Arduino without reseting the HIL board's state:
+        curl -X POST http://localhost:9999/api/v1/stack -H "Content-Type: application/json" -d "{\"reset\": false}"
+
+    Connect to Arduino with watchdog enabled:
+        curl -X POST http://localhost:9999/api/v1/stack -H "Content-Type: application/json" -d "{\"watchdog\": true}"
+
+    Gets a list with all available boards present (detected) in the stack, e.g. HIL, SIM switch, etc.
+        curl http://localhost:9999/api/v1/stack
+            
+    Switch ON USB1:
+        curl -X PUT http://localhost:9999/api/v1/stack/hil1/usb1 -H "Content-Type: application/json" -d "{\"state\": 1}"
+            or
+        curl -X PUT http://localhost:9999/api/v1/stack/hil1/usb1 -H "Content-Type: application/json" -d "{\"state\": \"on\"}"
+    
+    Get the state of USB1:
+        curl http://localhost:9999/api/v1/stack/hil1/usb1
+        
+    Switch OFF USB1:
+        curl -X PUT http://localhost:9999/api/v1/stack/hil1/usb1 -H "Content-Type: application/json" -d "{\"state\": 0}"
+            or 
+        curl -X PUT http://localhost:9999/api/v1/stack/hil1/usb1 -H "Content-Type: application/json" -d "{\"state\": \"off\"}"
+
+    Select SIM0 on SIM switch 0:
+        curl -X PUT http://localhost:9999/api/v1/stack/simsw0 -H "Content-Type: application/json" -d "{\"enabled\": 1, \"sim\": \"SIM0\"}"
+    
+    Select SIM1 on SIM switch 0:
+        curl -X PUT http://localhost:9999/api/v1/stack/simsw0 -H "Content-Type: application/json" -d "{\"enabled\": 0, \"sim\": \"SIM1\"}"
+
+    Get the state of the SIM switch 0:
+        curl  http://localhost:9999/api/v1/stack/simsw0
+        Response: {"enabled": true, "sim": "SIM1"}
+
+    Disables the SIM switch 0:
+        curl http://localhost:9999/api/v1/stack/simsw0   -> Store the active SIM
+        curl -X PUT http://localhost:9999/api/v1/stack/simsw0 -H "Content-Type: application/json" -d "{\"enabled\": 0, \"sim\": \"<The active SIM previously stored>\"}"
+
+    Gets the SIM configuration for simsw0
+        curl http://localhost:9999/api/v1/stack/simsw0/sims
+        ["SIM0", "SIM1"]
+
+    Disconnect from Arduino:
+        curl -X DELETE http://localhost:9999/api/v1/stack
+
+
+References:
+-----------
+    [1] http://en.wikipedia.org/wiki/Representational_state_transfer
+    [2] http://www.restapitutorial.com/lessons/httpmethods.html
+    [3] http://www.vinaysahni.com/best-practices-for-a-pragmatic-restful-api
+
+

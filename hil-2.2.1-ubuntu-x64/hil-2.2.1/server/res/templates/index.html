@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>HIL Stack</title>
+  <link rel="stylesheet" type="text/css" href="{{ static_url('css/it-mlaf.min.css') }}">
+  <style>
+        .extra-space {
+            margin-top: 2px;
+            margin-left: 2px;
+        }
+        .hidden-form {
+            visibility: hidden;
+        }
+    }
+  </style>
+  <script language="javascript">
+    {% if refresh_time %}
+        setTimeout("location.reload(true);", {{ refresh_time }});
+    {% end %}
+
+    function show_refresh_form() {
+        if (document.getElementById("set_refresh_form").style.visibility == "visible") {
+            document.getElementById("set_refresh_form").style.visibility="hidden";
+        } else {
+            document.getElementById("set_refresh_form").style.visibility="visible";
+        }
+    }
+
+  </script>
+</head>
+
+<body>
+    <div class="container">
+        <H3>HIL Stack</H3>
+
+        <form action="/" method="post">
+            <table>
+                <tr>
+                    <td>Connection status:</td>
+                    <td style="padding-left: 20px; font-weight: bold;">
+                        {% if online %} open {% else %} closed {% end %}
+                    </td>
+                    <td style="padding-left: 20px;">
+                        {% if online %}
+                            <input type="submit" name="Arduino" value="Disconnect" class="btn btn-danger btn-xs">
+                        {% else %}
+                            <input type="submit" name="Arduino" value="Connect" class="btn btn-success btn-xs">
+                        {% end %}
+                    </td>
+                </tr>
+
+                <tr>
+                    <td>Watchdog:</td>
+                    <td style="padding-left: 20px;">
+                        <input type="checkbox" name="watchdog" class="btn btn-xs"
+                            {% if online %}
+                                {% if watchdog %}
+                                    checked
+                                {% end %}
+                                onclick="return false;"
+                            {% end %}
+                        >
+                    </td>
+                    <td></td>
+                </tr>
+
+                {% if not online %}
+                <tr>
+                    <td>Reset state:</td>
+                    <td style="padding-left: 20px;">
+                        <input type="checkbox" name="reset" class="btn btn-xs" checked>
+                    </td>
+                    <td></td>
+                </tr>
+                {% end %}
+            </table>
+        </form>
+
+        {% if error %}
+            <P>&nbsp;</P>
+            Error is: {{ error_msg }}
+        {% end %}
+        <P>&nbsp;</P>
+
+        <table valign="top">
+            <tr>
+        {% if online and hil_boards_count > 0 %}
+                <td valign="top">
+                    <center><b>HIL board(s)</b></center>
+                    <form action="/" method="post">
+                        <table>
+                            <tr>
+                        {% for board in hil_boards %}
+                                <td align="center">
+                                    <b>{{ board }}</b>
+                                    <table>
+                                    {% for lane in ['1', '2', '3'] %}
+                                        <tr>
+                                            <td width="5"></td>
+                                            <td><b>lane {{ lane }}</b></td>
+                                            <td width="5"></td>
+                                            <td>
+                                            <div class="btn-group" role="group" aria-label="...">
+                                            {% for res in ['POWER', 'USB', 'SWITCH', 'USB_HS'] %}
+                                                {% set res_lane = res + lane %}
+                                                {% if hil_all_states[board][res_lane] %}
+                                                    <button type="submit" name="put_hil_{{ board }}_{{ res_lane }}_off" class="btn btn-success btn-xs extra-space">{{ res }}</button>
+                                                {% else %}
+                                                    <button type="submit" name="put_hil_{{ board }}_{{ res_lane }}_on" class="btn btn-default btn-xs extra-space">{{ res }}</button>
+                                                {% end %}
+                                            {% end %}
+                                            </div>
+                                            </td>
+                                        </tr>
+                                    {% end %}
+
+
+                                    </table>
+                               </td>
+                        {% end %}
+                            </tr>
+                        </table>
+                    </form>
+                </td>
+                <td width="10"/>
+        {% else %}
+                <td valign="top"></td>
+        {% end %}
+
+
+        {% if online and sim_switches_count > 0 %}
+                <td valign="top">
+                    <center><b>SIM Switch(es)</b></center>
+                    <form action="/" method="post">
+                        <table cellspacing="5">
+                            <tr>
+                        {% for simsw in sim_switches %}
+                                <td align="center">
+                                    <b>{{ simsw }}</b>
+                                    <table>
+                                    {% for sim_id in [0, 1, 2, 3] %}
+                                        <tr>
+                                            <td>
+                                                <div class="btn-group" role="group" aria-label="...">
+                                                    {% set sim_card = 'SIM' + str(sim_id) %}
+                                                    {% if sim_card in simsw_sim_config[simsw] %}
+                                                        {% set sim_card_on = '*' %}
+                                                    {% else %}
+                                                        {% set sim_card_on = '' %}
+                                                    {% end %}
+                                                    {% if simsw_all_states[simsw]['sim'] == sim_card and simsw_all_states[simsw]['enabled'] == 1 %}
+                                                        {% set new_state = 0 %}
+                                                        {% set style = "btn btn-success btn-xs extra-space" %}
+                                                    {% else %}
+                                                        {% set new_state = 1 %}
+                                                        {% if sim_card in simsw_sim_config[simsw] %}
+                                                            {% set style = "btn btn-default btn-xs extra-space" %}
+                                                        {% else %}
+                                                            {% set style = "btn btn-disabled btn-xs extra-space" %}
+                                                        {% end %}
+                                                    {% end %}
+                                                    <button type="submit" name="put_simsw_{{ simsw }}_{{ sim_card }}_{{ new_state }}" class="{{ style }}">{{ sim_card }}</button>
+
+                                                    {% set sim_card = 'SIM' + str(sim_id + 4) %}
+                                                    {% if simsw_all_states[simsw]['sim'] == sim_card and simsw_all_states[simsw]['enabled'] == 1 %}
+                                                        {% set new_state = 0 %}
+                                                        {% set style = "btn btn-success btn-xs extra-space" %}
+                                                    {% else %}
+                                                        {% set new_state = 1 %}
+                                                        {% if sim_card in simsw_sim_config[simsw] %}
+                                                            {% set style = "btn btn-default btn-xs extra-space" %}
+                                                        {% else %}
+                                                            {% set style = "btn btn-disabled btn-xs extra-space" %}
+                                                        {% end %}
+                                                    {% end %}
+                                                    <button type="submit" name="put_simsw_{{ simsw }}_{{ sim_card }}_{{ new_state }}" class="{{ style }}">{{ sim_card }}</button>
+                                                </div>
+                                            </td>
+                                            <td width="10"/>
+                                        </tr>
+                                    {% end %}
+                                    </table>
+                               </td>
+                        {% end %}
+                            </tr>
+                        </table>
+                    </form>
+                </td>
+        {% else %}
+            <td valign="top"></td>
+        {% end %}
+
+            </tr>
+        </table>
+        <P>&nbsp;</P>
+        <hr>
+        <a href="/log">Log</a>&nbsp;&nbsp;&nbsp;<a href="/api/v1/settings?pprint=true">Settings</a>&nbsp;&nbsp;&nbsp;<a href="/api/v1">API</a>&nbsp;&nbsp;&nbsp;<a href="/help">Help</a><BR>
+        <a href="https://soco.intel.com/docs/DOC-84438">User manual</a>&nbsp;&nbsp;&nbsp;<a href="https://soco.intel.com/docs/DOC-975140">Arduino drivers and f/w</a><BR>
+        Follow HIL on Inside Blue: <a href="http://harts.intel.com/hil">http://harts.intel.com/hil</a>
+        <hr>
+        <h6 align="center">HIL Stack Server ver {{ ver_server }}</h6>
+        <h6 align="center">{{ timestamp }}</h6>
+        <a href="#" onclick="show_refresh_form()">
+            <h6 align="center">Automatic refresh:
+                {% if refresh_time %}
+                    {{ refresh_time / 1000}}s
+                {% else %}
+                    disabled
+                {% end %}
+            </h6>
+        </a>
+
+
+        <form action="/" method="post" id="set_refresh_form" class="hidden-form">
+            <div class="row" align="center">
+                <div class="col-lg-6">
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" placeholder="Automatic refresh (seconds)..." name="new_refresh_interval">
+                  <span class="input-group-btn">
+                    <button class="btn btn-default" type="submit" name="set_refresh_interval_btn">Go!</button>
+                  </span>
+                </div><!-- /input-group -->
+              </div><!-- /.col-lg-6 -->
+            </div><!-- /.row -->
+        </form>
+
+    </div>
+</body>
+</html>

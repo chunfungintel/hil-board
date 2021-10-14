@@ -1,0 +1,69 @@
+#!/bin/bash
+###########################################################################
+#
+# Copyright (c) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+#
+# Contact: harts_support@intel.com
+#
+###########################################################################
+
+currentScript=`realpath $0`
+currentScriptPath=`dirname ${currentScript}`
+hilBasePath=`dirname ${currentScriptPath}../`
+hilServerPath=${hilBasePath}/server/hil_server
+
+# Port where HIL Server listens for clients.
+_hilPort=9999
+
+# OpenBSD netcat command
+_netcat=nc
+
+
+#######################################################################
+#
+# Stops the HIL server
+# 
+#######################################################################
+function stopHil () {
+    if isHilServerListening ; then
+        echo "Power off DUT on lane power1"
+        ${hilBasePath}/tools/dut-power-off
+
+        echo "Stopping HIL server from ${hilServerPath}"
+        ${hilServerPath} stop
+        if [ $? -ne 0 ] ; then
+            echo "The HIL server was not stopped successfully!"
+            exit 1
+        fi
+    else
+        echo "HIL server seems already stopped"
+    fi
+}
+
+
+#######################################################################
+#
+# Checks if the HIL Server is listening for connections.
+#
+#######################################################################
+
+function isHilServerListening () {
+
+    # Timeout in seconds. Note that because we are connecting to
+    # "localhost", time timeout is not supposed to be relevant.
+    local timeout=1
+
+    ${_netcat} -z -w ${timeout} localhost ${_hilPort}
+
+    # Exit status == 0 if HIL Server is listening on port ${_hilPort}
+    # Exit status != 0 if no one is listening on port ${_hilPort}
+}
+
+
+#######################################################################
+#
+#
+#######################################################################
+stopHil
+

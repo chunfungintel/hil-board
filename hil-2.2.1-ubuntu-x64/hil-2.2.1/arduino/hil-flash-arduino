@@ -1,0 +1,21 @@
+#!/bin/bash
+###########################################################################
+#
+# Copyright (c) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+#
+# Flashes the Arduino F/W
+#
+# N.B.: Expects the Harts_IO_Lite.hex file to be next to this script
+#
+###########################################################################
+
+currentScript=`realpath $0`
+currentScriptPath=`dirname ${currentScript}`
+fwPath="${currentScriptPath}/Harts_IO_Lite.hex"
+
+port=/dev/ttyACM0
+
+echo "Flashing f/w $fwPath to $port ..."
+
+avrdude -p atmega2560 -P $port -b 115200 -c wiring -D -U "flash:w:$fwPath"

@@ -1,0 +1,127 @@
+#!/bin/bash
+###########################################################################
+# 
+# Copyright (C) 2017 Intel Deutschland GmbH, All Rights Reserved.
+#
+# Register HIL service to run as daemon at boot time
+#
+#
+###########################################################################
+
+# The owner user of the hil_server process. Default is root.
+_user="root"
+
+
+currentScript=`realpath $0`
+currentScriptPath=`dirname ${currentScript}`
+hilBasePath=`dirname ${currentScriptPath}../`
+
+
+###########################################################################
+# Remove the old version of the HIL service (system V, upstart)
+###########################################################################
+function main () {
+    
+    processCliArgs "$@"
+
+    _checkUser root
+
+    installAndStartService
+}
+
+
+###########################################################################
+# Install and start service
+###########################################################################
+function installAndStartService () {
+
+    echo "Registering the HIL service to start as daemon at boot as user ${_user}"
+    _generateServiceFile
+    systemctl enable hil
+    echo "The HIL service was registered"
+    echo "Starting the HIL service"
+    systemctl start hil
+    echo "The HIL service was started"
+}
+
+###########################################################################
+# Generate service configuration file
+###########################################################################
+function _checkUser () {
+
+    local allowedUser=$1
+    local currentUser=$(id --user --name)
+
+    if [ ${currentUser} != ${allowedUser} ] ; then
+        echo "Only user \"${allowedUser}\" is allowed to run this tool."
+        exit 1
+    fi
+}
+
+###########################################################################
+# Generate service configuration file
+###########################################################################
+function _generateServiceFile () {
+
+    local hilServerStartPath=${hilBasePath}/tools/hil-start
+    local hilServerStopPath=${hilBasePath}/tools/hil-stop
+
+    echo "Starting HIL server with ${hilServerStartPath}"
+    echo "Stopping HIL server with ${hilServerStopPath}"
+
+    echo \
+"[Unit]
+Description=Hil daemon
+Documentation=${hilBasePath}/server/api.txt
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=forking
+User=${_user}
+Group=${_user}
+Environment=statedir=${hilBasePath}/server
+ExecStart=${hilServerStartPath} --ignore-ping --statedir \${statedir}
+ExecStop=${hilServerStopPath} --statedir \${statedir}
+
+[Install]
+WantedBy=multi-user.target
+" > /etc/systemd/system/hil.service
+}
+
+
+###########################################################################
+#
+# Processes the command line options.
+#
+###########################################################################
+
+function processCliArgs () {
+
+    for option in "$@" ; do
+        case "${option}" in
+            --help )
+                echo "Installs HIL service to run as deamon at boot time"
+                echo "--user" 
+                echo "    Runs the process as the given user. Default user is root"
+                exit 0
+                ;;
+            --user=* )
+                _user=$(expr "$option" : '--user=\(.*\)')
+                ;;
+            --*=* )
+                option=$(expr $option : '\(--.*\)=.*')
+                echo "$option : unknown option. Use --help for details."
+                exit 1
+                ;;
+            * )
+        esac
+    done
+}
+
+
+###########################################################################
+# Script entry point
+###########################################################################
+main "$@"
+
