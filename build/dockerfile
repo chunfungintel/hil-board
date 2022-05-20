@@ -1,0 +1,10 @@
+FROM ubuntu:20.04
+
+COPY hil-2.2.1 /hil
+COPY Linux_Quick_start.txt /Linux_Quick_start.txt
+
+EXPOSE 8000:9999
+
+ENTRYPOINT ["/hil/server/hil_server"]
+CMD ["start"]
+
